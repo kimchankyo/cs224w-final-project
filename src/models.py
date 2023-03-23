@@ -19,46 +19,6 @@ from torch_geometric.utils import softmax
 from typing import Dict
 
 
-# Poor excuse attempt
-# class BasicGCN(nn.Module):
-#   def __init__(self, num_features: int, num_classes: int, embedding_size: int = 128) -> None:
-#     super(BasicGCN, self).__init__()
-
-#     # GCN Embedding Layer
-#     self._embed_conv = GCNConv(num_features, embedding_size)
-
-#     # Message Layers
-#     self._msg1 = GCNConv(embedding_size, embedding_size)
-#     self._msg2 = GCNConv(embedding_size, embedding_size)
-
-#     # Aggregation Layer
-#     self._aggr = Linear(embedding_size*2, num_classes)
-
-#     # Non-Linear Layers
-#     self._relu = ReLU()
-
-#   def forward(self, x, edge_index, batch_index):
-#     # Embed Input
-#     print(x.shape)
-#     embed = self._embed_conv(x, edge_index)
-#     print(embed.shape)
-#     embed = self._relu(embed)
-    
-#     # Pass Message Layers
-#     msg = self._msg1(embed, edge_index)
-#     # Pass Message Layers
-#     msg = self._msg1(embed, edge_index)
-#     msg = self._relu(msg)
-#     msg = self._msg2(msg, edge_index)
-#     msg = self._relu(msg)
-
-#     # Aggregation Pooling
-#     aggr = torch.cat([global_mean_pool(msg, batch_index), global_max_pool(msg, batch_index)], dim=1)
-#     out = self._aggr(aggr)
-    
-#     return out, aggr
-
-
 # GNN Layers -> MessagePassing modules
 class GCN(MessagePassing):
   def __init__(self, in_channels: int, out_channels: int,
@@ -94,18 +54,6 @@ class GCN(MessagePassing):
   def forward(self, x: Tensor, edge_index: Adj, 
               edge_weight: Tensor = None) -> Tensor:
 
-    # if self.normalize:
-    #     if isinstance(edge_index, Tensor):
-    #         cache = self._cached_edge_index
-    #         if cache is None:
-    #             edge_index, edge_weight = gcn_norm(  # yapf: disable
-    #                 edge_index, edge_weight, x.size(self.node_dim),
-    #                 self.improved, self.add_self_loops, self.flow, x.dtype)
-    #             if self.cached:
-    #                 self._cached_edge_index = (edge_index, edge_weight)
-    #         else:
-    #             edge_index, edge_weight = cache[0], cache[1]
-
     # Linear Layer
     x = self.lin(x)
 
@@ -123,8 +71,6 @@ class GCN(MessagePassing):
   def message(self, x_j: Tensor, edge_weight: Tensor = None) -> Tensor:
     return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
-  # def message_and_aggregate(self, adj_t: Tensor, x: Tensor) -> Tensor:
-  #   return spmm(adj_t, x, reduce=self.aggr)
 
 # GraphSage Layer
 class GraphSage(MessagePassing):
