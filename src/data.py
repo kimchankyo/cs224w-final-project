@@ -35,6 +35,87 @@ def downloadMNISTSuperpixels(
     nx.draw_networkx(G, with_labels=False)
     plt.show()
 
+# Grid Form MNIST Dataset (Our modifeid MNIST dataset)
+USE_CORNER = False
+TRAIN = True
+BATCH_SIZE = 10000
+NUM_BATCHES = 6
+SAVE_PATH = 'MNISTGridTrain'
+H = 7
+W = 7
+
+G = nx.grid_2d_graph(H, W)
+if USE_CORNER:
+  G.add_edges_from([
+      ((x, y), (x+1, y+1))
+      for x in range(W-1)
+      for y in range(H-1)
+  ] + [
+      ((x+1, y), (x, y+1))
+      for x in range(W-1)
+      for y in range(H-1)
+  ])
+
+def make_grid(G, arr, label):
+  assert len(G) == len(arr.flatten())
+
+  node_color = []
+  for i, n in enumerate(G):
+      node_color.append(arr.flatten()[i].item())
+  
+  colors = {}
+  for i, node in enumerate(G.nodes):
+    colors[node] = node_color[i]
+  nx.set_node_attributes(G, colors, name='color')
+  data = from_networkx(G, group_node_attrs=['color'])
+  data.y = [label]
+  return data
+
+class GridDataset(InMemoryDataset):
+  def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
+    super().__init__(root, transform, pre_transform, pre_filter)
+
+  @property
+  def raw_file_names(self):
+    return 'download.pt'
+
+  @property
+  def processed_file_names(self):
+    names = []
+    for i in range(NUM_BATCHES):
+      names.append('data' + str(i) + '.pt')
+    return names
+
+  def download(self):
+    trainset = torchvision.datasets.MNIST(root='./data', train=TRAIN, 
+                                          download=True, 
+                                          transform=transforms.Compose(
+                                            [transforms.Resize((H, W)), 
+                                             transforms.ToTensor()]
+                                          ))
+    torch.save(trainset, osp.join(self.raw_dir, 'download.pt'))
+
+  def process(self):
+    trainset = torch.load(osp.join(self.raw_dir, 'download.pt'))
+    for i in range(NUM_BATCHES):
+      print('batch # ' + str(i))
+      datalist = []
+      for j in tqdm(range(BATCH_SIZE)):
+        idx = i*BATCH_SIZE + j
+        data = make_grid(G, trainset[idx][0], trainset[idx][1])
+        data.x = data.x.type(torch.float32)
+        data.y = torch.Tensor(data.y).type(torch.int64)
+        datalist.append(data)
+      torch.save(datalist, osp.join(self.processed_dir, f'data{i}.pt'))
+
+  def len(self):
+    return NUM_BATCHES * BATCH_SIZE
+
+  def get(self, idx):
+    batch = idx // BATCH_SIZE
+    datalist = torch.load(osp.join(self.processed_dir, f'data{batch}.pt'))
+    return datalist[idx % BATCH_SIZE]
+
 # Superpixel Generation Functions
 def segmentSuperpixels(image: np.ndarray, numSP: int, compactness: int, 
                        maxIter: int = 500) -> None:
@@ -161,7 +242,7 @@ def getDataList(images: np.ndarray, labels: np.ndarray, numSP: int,
     dataList.append(data)
   return dataList
 
-
+# CIFAR10 Superpixels (Our Custom Dataset)
 class CIFAR10Superpixels(InMemoryDataset):
 
   url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
@@ -202,6 +283,7 @@ class CIFAR10Superpixels(InMemoryDataset):
 
 
 if __name__ == "__main__":
-  root = '../data/cifar10-superpixels-128'
-  dataset = CIFAR10Superpixels(root=root, train=True, numSP=128, compactness=4, shuffle=True, fullConnect=False)
-  print(dataset[0])
+  # root = '../data/cifar10-superpixels-128'
+  # dataset = CIFAR10Superpixels(root=root, train=True, numSP=128, compactness=4, shuffle=True, fullConnect=False)
+  # print(dataset[0])
+  dataset = GridDataset('../data/{}'.format(SAVE_PATH))
